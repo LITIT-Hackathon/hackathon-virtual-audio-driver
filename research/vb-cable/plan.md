@@ -1,5 +1,8 @@
 # 🎯 Hackathon Project: Virtual Audio Cable
 
+> **Istorinis 12 valandų tyrimo planas. Nevykdyti kaip dabartinio backlog'o.**
+> Aktyvus planas yra [`../../HACKATHON_PLAN.md`](../../HACKATHON_PLAN.md).
+
 Since we only have **12 hours**, we should not try to build a full competitor to VB-CABLE.
 
 The best approach is to build a **minimal working Virtual Audio Cable prototype**.

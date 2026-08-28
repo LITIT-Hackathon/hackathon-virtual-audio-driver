@@ -1,0 +1,12 @@
+.vs/
+**/x64/
+**/Debug/
+**/Release/
+*.user
+*.suo
+*.pfx
+*.cer
+*.pvk
+*.log
+demo/evidence/*
+!demo/evidence/.gitkeep

@@ -1,5 +1,9 @@
 # Virtual Audio Device (VAD): Matrix Analysis and Windows Delivery Plan
 
+> **Produkto krypties dokumentas, ne kelių valandų vykdymo planas.**
+> Vykdyti [`../HACKATHON_PLAN.md`](../HACKATHON_PLAN.md) ir
+> [`../docs/MVP_ARCHITECTURE.md`](../docs/MVP_ARCHITECTURE.md).
+
 ## Scope and terminology
 
 In this document, **VAD** means a *Virtual Audio Device*, not voice-activity
