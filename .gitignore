@@ -10,3 +10,5 @@
 *.log
 demo/evidence/*
 !demo/evidence/.gitkeep
+tools/*.exe
+tools/*.vsconfig

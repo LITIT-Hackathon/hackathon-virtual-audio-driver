@@ -32,9 +32,11 @@ if ($sdkVersions) {
     $problems.Add('Windows SDK/WDK include directories were not found.')
 }
 
-$wdkTargets = "$kitsRoot\build\WindowsDriver.Common.targets"
-Write-Host ("WDK MSBuild targets: " + $(if (Test-Path $wdkTargets) { $wdkTargets } else { 'MISSING' }))
-if (-not (Test-Path $wdkTargets)) { $problems.Add('WDK MSBuild integration was not found.') }
+$wdkTargets = Get-ChildItem "$kitsRoot\build" -Filter 'WindowsDriver.Common.targets' -File -Recurse -ErrorAction SilentlyContinue |
+    Sort-Object FullName -Descending |
+    Select-Object -First 1 -ExpandProperty FullName
+Write-Host ("WDK MSBuild targets: " + $(if ($wdkTargets) { $wdkTargets } else { 'MISSING' }))
+if (-not $wdkTargets) { $problems.Add('WDK MSBuild integration was not found.') }
 
 foreach ($tool in 'git.exe', 'pnputil.exe') {
     $command = Get-Command $tool
