@@ -1,0 +1,26 @@
+LIT Virtual Audio Cable - G2 x64 Debug package
+================================================
+
+Contents
+--------
+This archive contains the complete componentized SysVAD test package.
+Do not copy only the SYS/INF/CAT files: the INF component graph also uses the
+included APO and keyword-detector DLL files.
+
+Device hardware ID
+------------------
+Root\LIT_VirtualAudioCable
+
+Expected endpoints after a successful test installation
+--------------------------------------------------------
+LIT Virtual Cable Input  (render/playback)
+LIT Virtual Cable Output (capture/recording)
+
+Important
+---------
+This is a WDK test-signed hackathon build, not a production-signed driver.
+Normal Secure Boot policy will reject it with Device Manager Code 52.
+
+Source branch: driver/mvp-cable
+G2 source commit: a1fe008
+
