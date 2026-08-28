@@ -13,4 +13,5 @@ demo/evidence/*
 tools/*.exe
 tools/*.vsconfig
 install-test-driver.log
+testsigning-enable.log
 .upstream-windows-driver-samples/
