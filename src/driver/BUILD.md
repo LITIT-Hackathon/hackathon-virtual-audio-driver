@@ -40,9 +40,9 @@ src\driver\Package\x64\Debug\package\
 
 It contains the required baseline artifacts:
 
-- `TabletAudioSample.sys`
+- `LITVirtualAudioCable.sys`
 - `ComponentizedAudioSample.inf` plus extension/APO INF files
-- `sysvad.cat`
+- `litvirtualaudiocable.cat`
 - the upstream APO and keyword detector DLLs
 
 This is the unchanged Microsoft SysVAD baseline. It does not yet use LIT

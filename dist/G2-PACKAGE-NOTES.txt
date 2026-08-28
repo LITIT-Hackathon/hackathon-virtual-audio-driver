@@ -21,6 +21,11 @@ Important
 This is a WDK test-signed hackathon build, not a production-signed driver.
 Normal Secure Boot policy will reject it with Device Manager Code 52.
 
-Source branch: driver/mvp-cable
-G2 source commit: a1fe008
+Package identity
+----------------
+Kernel binary: LITVirtualAudioCable.sys
+Catalog:       litvirtualaudiocable.cat
+Service:       lit_virtual_audio_cable
+APO component: SWC\VEN_LITH&CID_VADAPO
 
+Source branch: driver/mvp-cable
