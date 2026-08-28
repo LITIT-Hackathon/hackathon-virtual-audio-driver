@@ -12,4 +12,5 @@ demo/evidence/*
 !demo/evidence/.gitkeep
 tools/*.exe
 tools/*.vsconfig
+install-test-driver.log
 .upstream-windows-driver-samples/
