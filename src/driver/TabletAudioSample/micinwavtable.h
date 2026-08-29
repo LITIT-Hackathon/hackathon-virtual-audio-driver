@@ -18,11 +18,11 @@ Abstract:
 //
 // Mic in (external: headphone) range.
 //
-#define MICIN_DEVICE_MAX_CHANNELS           1       // Max Channels.
+#define MICIN_DEVICE_MAX_CHANNELS           2       // Fixed LIT cable stereo.
 #define MICIN_MIN_BITS_PER_SAMPLE_PCM       16      // Min Bits Per Sample
 #define MICIN_MAX_BITS_PER_SAMPLE_PCM       16      // Max Bits Per Sample
-#define MICIN_MIN_SAMPLE_RATE               8000    // Min Sample Rate
-#define MICIN_MAX_SAMPLE_RATE               48000   // Max Sample Rate
+#define MICIN_MIN_SAMPLE_RATE               48000   // Fixed LIT cable rate
+#define MICIN_MAX_SAMPLE_RATE               48000   // Fixed LIT cable rate
 
 //
 // Max # of pin instances.
@@ -235,6 +235,27 @@ KSDATAFORMAT_WAVEFORMATEXTENSIBLE MicInPinSupportedDeviceFormats[] =
     }
 };
 
+// The capture endpoint intentionally exposes the same fixed PCM format as the
+// render endpoint so the route never resamples or converts frames.
+static
+KSDATAFORMAT_WAVEFORMATEXTENSIBLE LitCableMicInFormat[] =
+{
+    {
+        {
+            sizeof(KSDATAFORMAT_WAVEFORMATEXTENSIBLE), 0, 0, 0,
+            STATICGUIDOF(KSDATAFORMAT_TYPE_AUDIO),
+            STATICGUIDOF(KSDATAFORMAT_SUBTYPE_PCM),
+            STATICGUIDOF(KSDATAFORMAT_SPECIFIER_WAVEFORMATEX)
+        },
+        {
+            { WAVE_FORMAT_EXTENSIBLE, 2, 48000, 192000, 4, 16,
+              sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX) },
+            16, KSAUDIO_SPEAKER_STEREO,
+            STATICGUIDOF(KSDATAFORMAT_SUBTYPE_PCM)
+        }
+    }
+};
+
 //
 // Supported modes (only on streaming pins).
 //
@@ -263,6 +284,13 @@ MODE_AND_DEFAULT_FORMAT MicInPinSupportedDeviceModes[] =
     },
 };
 
+static
+MODE_AND_DEFAULT_FORMAT LitCableMicInModes[] =
+{
+    { STATIC_AUDIO_SIGNALPROCESSINGMODE_RAW, &LitCableMicInFormat[0].DataFormat },
+    { STATIC_AUDIO_SIGNALPROCESSINGMODE_DEFAULT, &LitCableMicInFormat[0].DataFormat },
+};
+
 //
 // The entries here must follow the same order as the filter's pin
 // descriptor array.
@@ -278,10 +306,10 @@ PIN_DEVICE_FORMATS_AND_MODES MicInPinDeviceFormatsAndModes[] =
     },
     {
         SystemCapturePin,
-        MicInPinSupportedDeviceFormats,
-        SIZEOF_ARRAY(MicInPinSupportedDeviceFormats),
-        MicInPinSupportedDeviceModes,
-        SIZEOF_ARRAY(MicInPinSupportedDeviceModes)
+        LitCableMicInFormat,
+        SIZEOF_ARRAY(LitCableMicInFormat),
+        LitCableMicInModes,
+        SIZEOF_ARRAY(LitCableMicInModes)
     }
 };
 

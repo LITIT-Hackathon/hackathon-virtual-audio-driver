@@ -26,8 +26,8 @@ Abstract:
 #define SPEAKER_HOST_MAX_CHANNELS                   2       // Max Channels.
 #define SPEAKER_HOST_MIN_BITS_PER_SAMPLE            16      // Min Bits Per Sample
 #define SPEAKER_HOST_MAX_BITS_PER_SAMPLE            16      // Max Bits Per Sample
-#define SPEAKER_HOST_MIN_SAMPLE_RATE                24000   // Min Sample Rate
-#define SPEAKER_HOST_MAX_SAMPLE_RATE                96000   // Max Sample Rate
+#define SPEAKER_HOST_MIN_SAMPLE_RATE                48000   // Fixed LIT cable rate
+#define SPEAKER_HOST_MAX_SAMPLE_RATE                48000   // Fixed LIT cable rate
 
 #define SPEAKER_OFFLOAD_MAX_CHANNELS                2       // Max Channels.
 #define SPEAKER_OFFLOAD_MIN_BITS_PER_SAMPLE         16      // Min Bits Per Sample
@@ -340,6 +340,27 @@ KSDATAFORMAT_WAVEFORMATEXTENSIBLE SpeakerHostPinSupportedDeviceFormats[] =
     }
 };
 
+// The LIT cable transports only this format. Keep it separate from the sample
+// tables above because they are also used as reference material by SysVAD.
+static
+KSDATAFORMAT_WAVEFORMATEXTENSIBLE LitCableSpeakerFormat[] =
+{
+    {
+        {
+            sizeof(KSDATAFORMAT_WAVEFORMATEXTENSIBLE), 0, 0, 0,
+            STATICGUIDOF(KSDATAFORMAT_TYPE_AUDIO),
+            STATICGUIDOF(KSDATAFORMAT_SUBTYPE_PCM),
+            STATICGUIDOF(KSDATAFORMAT_SPECIFIER_WAVEFORMATEX)
+        },
+        {
+            { WAVE_FORMAT_EXTENSIBLE, 2, 48000, 192000, 4, 16,
+              sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX) },
+            16, KSAUDIO_SPEAKER_STEREO,
+            STATICGUIDOF(KSDATAFORMAT_SUBTYPE_PCM)
+        }
+    }
+};
+
 static 
 KSDATAFORMAT_WAVEFORMATEXTENSIBLE SpeakerOffloadPinSupportedDeviceFormats[] =
 {
@@ -428,6 +449,14 @@ MODE_AND_DEFAULT_FORMAT SpeakerHostPinSupportedDeviceModes[] =
 };
 
 static
+MODE_AND_DEFAULT_FORMAT LitCableSpeakerModes[] =
+{
+    { STATIC_AUDIO_SIGNALPROCESSINGMODE_RAW, &LitCableSpeakerFormat[0].DataFormat },
+    { STATIC_AUDIO_SIGNALPROCESSINGMODE_DEFAULT, &LitCableSpeakerFormat[0].DataFormat },
+    { STATIC_AUDIO_SIGNALPROCESSINGMODE_MEDIA, &LitCableSpeakerFormat[0].DataFormat },
+};
+
+static
 MODE_AND_DEFAULT_FORMAT SpeakerOffloadPinSupportedDeviceModes[] =
 {
     {
@@ -449,10 +478,10 @@ PIN_DEVICE_FORMATS_AND_MODES SpeakerPinDeviceFormatsAndModes[] =
 {
     {
         SystemRenderPin,
-        SpeakerHostPinSupportedDeviceFormats,
-        SIZEOF_ARRAY(SpeakerHostPinSupportedDeviceFormats),
-        SpeakerHostPinSupportedDeviceModes,
-        SIZEOF_ARRAY(SpeakerHostPinSupportedDeviceModes)
+        LitCableSpeakerFormat,
+        SIZEOF_ARRAY(LitCableSpeakerFormat),
+        LitCableSpeakerModes,
+        SIZEOF_ARRAY(LitCableSpeakerModes)
     },
     {
         OffloadRenderPin,
