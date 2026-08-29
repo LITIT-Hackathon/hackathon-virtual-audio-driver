@@ -6,6 +6,23 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $hardwareId = 'Root\LIT_VirtualAudioCable'
 $logFile = Join-Path $repoRoot 'install-test-driver.log'
 
+# A 32-bit PowerShell process is redirected away from the native System32
+# directory. Sysnative provides access to the native Windows tools in that case.
+$nativeSystemDirectory = if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess) {
+    Join-Path $env:WINDIR 'Sysnative'
+} else {
+    Join-Path $env:WINDIR 'System32'
+}
+$bcdedit = Join-Path $nativeSystemDirectory 'bcdedit.exe'
+$certutil = Join-Path $nativeSystemDirectory 'certutil.exe'
+$pnputil = Join-Path $nativeSystemDirectory 'pnputil.exe'
+
+foreach ($requiredTool in $bcdedit, $certutil, $pnputil) {
+    if (-not (Test-Path -LiteralPath $requiredTool)) {
+        throw "Required Windows system tool was not found: $requiredTool"
+    }
+}
+
 function Write-InstallLog {
     param([string]$Message)
     $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Message"
@@ -18,7 +35,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     throw 'Run this script from an elevated PowerShell session.'
 }
 
-$testSigning = (& bcdedit.exe /enum '{current}' 2>&1 | Out-String)
+$testSigning = (& $bcdedit /enum '{current}' 2>&1 | Out-String)
 if ($testSigning -notmatch '(?im)^testsigning\s+Yes\s*$') {
     throw 'TESTSIGNING is not enabled. Run scripts\enable-test-signing.ps1 as Administrator, then restart Windows.'
 }
@@ -60,7 +77,7 @@ $certificate = Get-ChildItem -LiteralPath $packageDir -Filter '*.cer' -File -Err
 if ($certificate) {
     Write-InstallLog "Importing public test certificate: $($certificate.Name)"
     foreach ($store in 'Root', 'TrustedPublisher') {
-        & certutil.exe -addstore $store $certificate.FullName 2>&1 |
+        & $certutil -addstore $store $certificate.FullName 2>&1 |
             Tee-Object -FilePath $logFile -Append
         if ($LASTEXITCODE -ne 0) { throw "Failed to import the test certificate into $store." }
     }
@@ -69,7 +86,7 @@ if ($certificate) {
 # Stage the entire component graph before creating/updating the root device.
 foreach ($inf in Get-ChildItem -LiteralPath $packageDir -Filter '*.inf' -File) {
     Write-InstallLog "Staging $($inf.Name)"
-    & pnputil.exe /add-driver $inf.FullName /install 2>&1 |
+    & $pnputil /add-driver $inf.FullName /install 2>&1 |
         Tee-Object -FilePath $logFile -Append
     if ($LASTEXITCODE -ne 0) { throw "PnPUtil failed while staging $($inf.Name)." }
 }
@@ -93,7 +110,7 @@ foreach ($serviceName in 'AudioEndpointBuilder', 'Audiosrv') {
     Write-InstallLog "$serviceName is running and configured for automatic startup."
 }
 
-& pnputil.exe /scan-devices 2>&1 | Tee-Object -FilePath $logFile -Append
+& $pnputil /scan-devices 2>&1 | Tee-Object -FilePath $logFile -Append
 Start-Sleep -Seconds 5
 
 $device = Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
