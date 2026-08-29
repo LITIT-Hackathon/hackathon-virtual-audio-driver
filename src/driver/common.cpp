@@ -51,6 +51,11 @@ Abstract:
 //-----------------------------------------------------------------------------
 
 PDEVICE_OBJECT          CSaveData::m_pDeviceObject = NULL;
+
+// The MVP has exactly one route: 48 kHz, 16-bit, stereo PCM. Keep two seconds
+// of audio so a temporarily slower capture client retains the newest samples.
+static const ULONG LIT_CABLE_BYTES_PER_FRAME = 4;
+static const ULONG LIT_CABLE_FRAME_CAPACITY = 48000 * 2;
 //=============================================================================
 // Classes
 //=============================================================================
@@ -83,6 +88,9 @@ class CAdapterCommon :
 
         PCSYSVADHW              m_pHW;                  // Virtual SYSVAD HW object
         PPORTCLSETWHELPER       m_pPortClsEtwHelper;
+        PBYTE                    m_pCableBuffer;
+        volatile LONGLONG        m_CableReadFrame;
+        volatile LONGLONG        m_CableWriteFrame;
 
         static LONG             m_AdapterInstances;     // # of adapter objects.
 
@@ -168,6 +176,18 @@ class CAdapterCommon :
         );
 
         STDMETHODIMP_(void)     MixerReset(void);
+
+        STDMETHODIMP_(void)     WriteCableFrames
+        (
+            _In_reads_(FrameCount * 4) const BYTE * Frames,
+            _In_ ULONG FrameCount
+        );
+
+        STDMETHODIMP_(void)     ReadCableFrames
+        (
+            _Out_writes_(FrameCount * 4) BYTE * Frames,
+            _In_ ULONG FrameCount
+        );
 
         STDMETHODIMP_(LONG)     MixerVolumeRead
         ( 
@@ -641,6 +661,7 @@ Return Value:
         delete m_pHW;
         m_pHW = NULL;
     }
+    SAFE_DELETE_PTR_WITH_TAG(m_pCableBuffer, LIT_CABLE_POOLTAG);
     SAFE_RELEASE(m_pPortClsEtwHelper);
     SAFE_RELEASE(m_pServiceGroupWave);
  
@@ -788,6 +809,9 @@ Return Value:
     m_PowerState            = PowerDeviceD0;
     m_pHW                   = NULL;
     m_pPortClsEtwHelper     = NULL;
+    m_pCableBuffer           = NULL;
+    m_CableReadFrame         = 0;
+    m_CableWriteFrame        = 0;
 
     InitializeListHead(&m_SubdeviceCache);
 
@@ -834,6 +858,17 @@ Return Value:
     
     m_pHW->MixerReset();
 
+    m_pCableBuffer = (PBYTE)ExAllocatePool2(
+        POOL_FLAG_NON_PAGED,
+        LIT_CABLE_FRAME_CAPACITY * LIT_CABLE_BYTES_PER_FRAME,
+        LIT_CABLE_POOLTAG);
+    if (!m_pCableBuffer)
+    {
+        ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+        goto Done;
+    }
+    RtlZeroMemory(m_pCableBuffer, LIT_CABLE_FRAME_CAPACITY * LIT_CABLE_BYTES_PER_FRAME);
+
     //
     // Initialize SaveData class.
     //
@@ -871,6 +906,106 @@ Return Value:
         m_pHW->MixerReset();
     }
 } // MixerReset
+
+//=============================================================================
+// These two methods form a bounded SPSC PCM route. The producer may advance
+// the read index on overflow; the consumer uses CAS so it never consumes a
+// frame that was discarded by that overflow policy.
+#pragma code_seg()
+STDMETHODIMP_(void)
+CAdapterCommon::WriteCableFrames
+(
+    _In_reads_(FrameCount * LIT_CABLE_BYTES_PER_FRAME) const BYTE * Frames,
+    _In_ ULONG FrameCount
+)
+{
+    if (!m_pCableBuffer || FrameCount == 0)
+    {
+        return;
+    }
+
+    if (FrameCount > LIT_CABLE_FRAME_CAPACITY)
+    {
+        ULONG skip = FrameCount - LIT_CABLE_FRAME_CAPACITY;
+        Frames += skip * LIT_CABLE_BYTES_PER_FRAME;
+        FrameCount = LIT_CABLE_FRAME_CAPACITY;
+    }
+
+    LONGLONG write = m_CableWriteFrame;
+    LONGLONG requiredRead = write + FrameCount - LIT_CABLE_FRAME_CAPACITY;
+    while (requiredRead > m_CableReadFrame)
+    {
+        LONGLONG observedRead = m_CableReadFrame;
+        if (observedRead >= requiredRead ||
+            InterlockedCompareExchange64(&m_CableReadFrame, requiredRead, observedRead) == observedRead)
+        {
+            break;
+        }
+    }
+
+    ULONG first = (ULONG)(write % LIT_CABLE_FRAME_CAPACITY);
+    ULONG firstCount = min(FrameCount, LIT_CABLE_FRAME_CAPACITY - first);
+    RtlCopyMemory(
+        m_pCableBuffer + first * LIT_CABLE_BYTES_PER_FRAME,
+        Frames,
+        firstCount * LIT_CABLE_BYTES_PER_FRAME);
+    if (firstCount < FrameCount)
+    {
+        RtlCopyMemory(
+            m_pCableBuffer,
+            Frames + firstCount * LIT_CABLE_BYTES_PER_FRAME,
+            (FrameCount - firstCount) * LIT_CABLE_BYTES_PER_FRAME);
+    }
+
+    InterlockedExchange64(&m_CableWriteFrame, write + FrameCount);
+}
+
+//=============================================================================
+#pragma code_seg()
+STDMETHODIMP_(void)
+CAdapterCommon::ReadCableFrames
+(
+    _Out_writes_(FrameCount * LIT_CABLE_BYTES_PER_FRAME) BYTE * Frames,
+    _In_ ULONG FrameCount
+)
+{
+    RtlZeroMemory(Frames, FrameCount * LIT_CABLE_BYTES_PER_FRAME);
+    if (!m_pCableBuffer || FrameCount == 0)
+    {
+        return;
+    }
+
+    for (;;)
+    {
+        RtlZeroMemory(Frames, FrameCount * LIT_CABLE_BYTES_PER_FRAME);
+        LONGLONG read = m_CableReadFrame;
+        LONGLONG write = m_CableWriteFrame;
+        ULONG available = (ULONG)min((LONGLONG)FrameCount, write - read);
+        if (available == 0)
+        {
+            return;
+        }
+
+        ULONG first = (ULONG)(read % LIT_CABLE_FRAME_CAPACITY);
+        ULONG firstCount = min(available, LIT_CABLE_FRAME_CAPACITY - first);
+        RtlCopyMemory(
+            Frames,
+            m_pCableBuffer + first * LIT_CABLE_BYTES_PER_FRAME,
+            firstCount * LIT_CABLE_BYTES_PER_FRAME);
+        if (firstCount < available)
+        {
+            RtlCopyMemory(
+                Frames + firstCount * LIT_CABLE_BYTES_PER_FRAME,
+                m_pCableBuffer,
+                (available - firstCount) * LIT_CABLE_BYTES_PER_FRAME);
+        }
+
+        if (InterlockedCompareExchange64(&m_CableReadFrame, read + available, read) == read)
+        {
+            return;
+        }
+    }
+}
 
 //=============================================================================
 /* Here are the definitions of the standard miniport events.

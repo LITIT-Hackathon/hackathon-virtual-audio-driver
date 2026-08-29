@@ -118,6 +118,7 @@ Abstract:
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 #define MINWAVERT_POOLTAG           'RWNM'
+#define LIT_CABLE_POOLTAG           'CbIL'
 #define MINTOPORT_POOLTAG           'RTNM'
 #define MINADAPTER_POOLTAG          'uAyS'
 #define USBSIDEBANDTEST_POOLTAG01   '1AyS'
@@ -559,6 +560,22 @@ DECLARE_INTERFACE_(IAdapterCommon, IUnknown)
     STDMETHOD_(VOID,            MixerReset) 
     ( 
         THIS 
+    ) PURE;
+
+    // Fixed 48 kHz, 16-bit stereo render-to-capture route. These methods are
+    // called only from the WaveRT streaming path and accept whole PCM frames.
+    STDMETHOD_(VOID,            WriteCableFrames)
+    (
+        THIS_
+        _In_reads_(FrameCount * 4) const BYTE * Frames,
+        _In_ ULONG FrameCount
+    ) PURE;
+
+    STDMETHOD_(VOID,            ReadCableFrames)
+    (
+        THIS_
+        _Out_writes_(FrameCount * 4) BYTE * Frames,
+        _In_ ULONG FrameCount
     ) PURE;
 
     STDMETHOD_(NTSTATUS,        WriteEtwEvent) 

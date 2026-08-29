@@ -1427,7 +1427,7 @@ VOID CMiniportWaveRTStream::UpdatePosition
 
     if (m_bCapture)
     {
-        // Write sine wave to buffer.
+        // Capture consumes the fixed render-to-capture PCM route.
         WriteBytes(ByteDisplacement);
     }
     else
@@ -1469,11 +1469,9 @@ VOID CMiniportWaveRTStream::UpdatePosition
                                         0);
         }
 
-        if (!g_DoNotCreateDataFiles)
-        {
-            // Read from buffer and write to a file.
-            ReadBytes(ByteDisplacement);
-        }
+        // Render produces PCM for the fixed capture route. This is deliberately
+        // independent of the optional SysVAD sample file-saving feature.
+        ReadBytes(ByteDisplacement);
     }
     
     // Increment the DMA position by the number of bytes displaced since the last
@@ -1502,7 +1500,7 @@ VOID CMiniportWaveRTStream::WriteBytes
 
 Routine Description:
 
-This function writes the audio buffer using a sine wave generator
+This function fills the capture DMA buffer from the LIT cable route.
 Arguments:
 
 ByteDisplacement - # of bytes to process.
@@ -1516,7 +1514,15 @@ ByteDisplacement - # of bytes to process.
     while (ByteDisplacement > 0)
     {
         ULONG runWrite = min(ByteDisplacement, m_ulDmaBufferSize - bufferOffset);
-            m_ToneGenerator.GenerateSine(m_pDmaBuffer + bufferOffset, runWrite);
+        ULONG frameBytes = m_pWfExt->Format.nBlockAlign;
+        ULONG frameCount = runWrite / frameBytes;
+        PADAPTERCOMMON adapter = m_pMiniport->GetAdapterCommObj();
+        adapter->ReadCableFrames(m_pDmaBuffer + bufferOffset, frameCount);
+        if (runWrite > frameCount * frameBytes)
+        {
+            RtlZeroMemory(m_pDmaBuffer + bufferOffset + frameCount * frameBytes,
+                          runWrite - frameCount * frameBytes);
+        }
         bufferOffset = (bufferOffset + runWrite) % m_ulDmaBufferSize;
         ByteDisplacement -= runWrite;
     }
@@ -1532,7 +1538,7 @@ VOID CMiniportWaveRTStream::ReadBytes
 
 Routine Description:
 
-This function reads the audio buffer and saves the data in a file.
+This function copies rendered PCM frames into the LIT cable route.
 
 Arguments:
 
@@ -1547,7 +1553,10 @@ ByteDisplacement - # of bytes to process.
     while (ByteDisplacement > 0)
     {
         ULONG runWrite = min(ByteDisplacement, m_ulDmaBufferSize - bufferOffset);
-        m_SaveData.WriteData(m_pDmaBuffer + bufferOffset, runWrite);
+        ULONG frameBytes = m_pWfExt->Format.nBlockAlign;
+        ULONG frameCount = runWrite / frameBytes;
+        PADAPTERCOMMON adapter = m_pMiniport->GetAdapterCommObj();
+        adapter->WriteCableFrames(m_pDmaBuffer + bufferOffset, frameCount);
         bufferOffset = (bufferOffset + runWrite) % m_ulDmaBufferSize;
         ByteDisplacement -= runWrite;
     }
