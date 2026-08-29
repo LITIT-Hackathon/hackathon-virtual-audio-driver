@@ -10,6 +10,7 @@
 *.log
 demo/evidence/*
 !demo/evidence/.gitkeep
+!demo/evidence/lit-virtual-audio-cable-demo.mp4
 tools/*.exe
 tools/*.vsconfig
 install-test-driver.log
