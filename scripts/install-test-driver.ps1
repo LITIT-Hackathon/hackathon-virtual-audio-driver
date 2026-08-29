@@ -86,9 +86,22 @@ if ($certificate) {
 # Stage the entire component graph before creating/updating the root device.
 foreach ($inf in Get-ChildItem -LiteralPath $packageDir -Filter '*.inf' -File) {
     Write-InstallLog "Staging $($inf.Name)"
-    & $pnputil /add-driver $inf.FullName /install 2>&1 |
-        Tee-Object -FilePath $logFile -Append
-    if ($LASTEXITCODE -ne 0) { throw "PnPUtil failed while staging $($inf.Name)." }
+    $pnpOutput = & $pnputil /add-driver $inf.FullName /install 2>&1
+    $pnpExitCode = $LASTEXITCODE
+    $pnpOutput | Tee-Object -FilePath $logFile -Append
+
+    # Some Windows Server builds return a non-zero code when the package is
+    # already present even though PnPUtil reports that it is installed and
+    # up-to-date. Treat that idempotent result as success.
+    $pnpText = $pnpOutput | Out-String
+    $alreadyInstalled = $pnpText -match '(?i)driver package added successfully' -and
+        $pnpText -match '(?i)already exists|up-to-date'
+    if ($pnpExitCode -ne 0 -and -not $alreadyInstalled) {
+        throw "PnPUtil failed while staging $($inf.Name) (exit code $pnpExitCode)."
+    }
+    if ($pnpExitCode -ne 0) {
+        Write-InstallLog "PnPUtil exit code $pnpExitCode accepted because the package is already installed and up-to-date."
+    }
 }
 
 $existingOutput = & $devcon findall $hardwareId 2>&1 | Out-String
