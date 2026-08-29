@@ -117,7 +117,9 @@ $device = Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
     Where-Object { $_.FriendlyName -eq 'LIT Virtual Audio Cable' } |
     Select-Object -First 1
 $endpoints = Get-PnpDevice -Class AudioEndpoint -PresentOnly -ErrorAction SilentlyContinue |
-    Where-Object { $_.FriendlyName -like 'LIT Virtual Cable*' }
+    # Windows commonly prefixes endpoint names with "Speakers" or "Microphone",
+    # for example: "Speakers (LIT Virtual Cable Input)".
+    Where-Object { $_.FriendlyName -like '*LIT Virtual Cable*' }
 
 Write-InstallLog "Adapter status: $(if ($device) { $device.Status } else { 'NOT FOUND' })"
 if ($endpoints) {
