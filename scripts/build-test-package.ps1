@@ -8,16 +8,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-$msbuild = if (Test-Path -LiteralPath $vswhere) {
-    & $vswhere -all -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath |
-        ForEach-Object { Join-Path $_ 'MSBuild\Current\Bin\MSBuild.exe' } |
-        Where-Object { Test-Path -LiteralPath $_ } |
-        Select-Object -First 1
-}
-if (-not $msbuild) { throw 'MSBuild with the Visual C++ x64 toolchain was not found.' }
 
 if (-not $SkipBuild) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    $msbuild = if (Test-Path -LiteralPath $vswhere) {
+        & $vswhere -all -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath |
+            ForEach-Object { Join-Path $_ 'MSBuild\Current\Bin\MSBuild.exe' } |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -First 1
+    }
+    if (-not $msbuild) { throw 'MSBuild with the Visual C++ x64 toolchain was not found.' }
+
     $commonProject = Join-Path $repoRoot 'src\driver\EndpointsCommon\EndpointsCommon.vcxproj'
     $packageProject = Join-Path $repoRoot 'src\driver\Package\package.vcxproj'
 

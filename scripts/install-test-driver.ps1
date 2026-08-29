@@ -126,14 +126,29 @@ if ($existingOutput -match '(?i)LIT Virtual Audio Cable|ROOT\\MEDIA') {
 }
 if ($LASTEXITCODE -ne 0) { throw 'DevCon failed to install or update the LIT virtual audio device.' }
 
-# Windows Server can keep these services disabled. The MEDIA adapter may then
-# report Started while no MMDEVAPI AudioEndpoint devices exist.
+# Windows Server can keep these services disabled. In addition, removing and
+# recreating a root MEDIA device can leave its SWD\MMDEVAPI children registered
+# but not present. Restart the complete audio service stack after the KS
+# interfaces exist so AudioEndpointBuilder performs a fresh discovery pass.
 foreach ($serviceName in 'AudioEndpointBuilder', 'Audiosrv') {
-    $service = Get-Service -Name $serviceName -ErrorAction Stop
     Set-Service -Name $serviceName -StartupType Automatic
-    if ($service.Status -ne 'Running') { Start-Service -Name $serviceName }
-    Write-InstallLog "$serviceName is running and configured for automatic startup."
 }
+
+$audioService = Get-Service -Name Audiosrv -ErrorAction Stop
+if ($audioService.Status -ne 'Stopped') {
+    Write-InstallLog 'Stopping Windows Audio before rebuilding MMDEVAPI endpoints.'
+    Stop-Service -Name Audiosrv -Force -ErrorAction Stop
+}
+
+$endpointBuilder = Get-Service -Name AudioEndpointBuilder -ErrorAction Stop
+if ($endpointBuilder.Status -ne 'Stopped') {
+    Write-InstallLog 'Restarting Audio Endpoint Builder for a fresh endpoint discovery pass.'
+    Stop-Service -Name AudioEndpointBuilder -Force -ErrorAction Stop
+}
+
+Start-Service -Name AudioEndpointBuilder -ErrorAction Stop
+Start-Service -Name Audiosrv -ErrorAction Stop
+Write-InstallLog 'AudioEndpointBuilder and Audiosrv are running and configured for automatic startup.'
 
 & $pnputil /scan-devices 2>&1 | Tee-Object -FilePath $logFile -Append
 Start-Sleep -Seconds 5
@@ -156,6 +171,19 @@ if ($endpoints) {
 }
 
 Write-InstallLog 'No LIT AudioEndpoint devices were enumerated.'
+$mmDeviceRoot = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio'
+$registeredEndpoints = foreach ($flow in 'Render', 'Capture') {
+    Get-ChildItem -LiteralPath (Join-Path $mmDeviceRoot $flow) -ErrorAction SilentlyContinue |
+        Where-Object {
+            (Get-ItemProperty -LiteralPath (Join-Path $_.PSPath 'Properties') -ErrorAction SilentlyContinue).PSObject.Properties.Value -like '*LIT Virtual*'
+        } |
+        ForEach-Object { [pscustomobject]@{ Flow = $flow; EndpointId = $_.PSChildName } }
+}
+if ($registeredEndpoints) {
+    Write-InstallLog 'MMDEVAPI records exist, but their AudioEndpoint PnP nodes are not present:'
+    $registeredEndpoints | Format-Table -AutoSize |
+        Out-String | Tee-Object -FilePath $logFile -Append | Write-Host
+}
 Get-Service AudioEndpointBuilder, Audiosrv |
     Format-Table Name, Status, StartType -AutoSize |
     Out-String | Tee-Object -FilePath $logFile -Append | Write-Host
