@@ -1,5 +1,25 @@
 # Aktyvus 4 valandų hackathono planas
 
+## Aktyvus apribojimas ir sprendimas
+
+Person A įmonės valdomame kompiuteryje negali išjungti `Secure Boot` ar įjungti
+`TESTSIGNING`. Tai yra aplinkos apribojimas, o ne INF ar buildo defektas. Nuo šio
+momento Person A nebekartoja lokalaus kernelinio driverio diegimo.
+
+Darbas tęsiamas dviem nepriklausomais takais:
+
+1. **Mūsų driverio įrodymas:** `driver/mvp-cable` šakoje laikomas unikalaus LIT
+   identiteto SysVAD source, sėkmingas x64 buildas ir pilnas testinis ZIP.
+2. **Veikiantis audio-flow demo:** įmonės kompiuteryje galima naudoti jau
+   įdiegtą trečiosios šalies virtualų kabelį tik kaip testavimo infrastruktūrą
+   signalui ir OBS eigai parodyti. Jo binary, INF ar implementacija nėra mūsų
+   rezultatas ir prezentacijoje taip ir sakoma.
+
+Person B mūsų ZIP diegia tik kompiuteryje, kuriame leidžiamas testinis kernelio
+kodas. Jei ir B aplinka tai blokuoja, G2 runtime patikra pažymima `BLOCKED BY
+ENTERPRISE POLICY`, o laikas skiriamas source, buildo, architektūros ir demo
+paruošimui. Secure Boot kliūtis nebelaikoma taisytinu driverio bug'u.
+
 > Tai vienintelis vykdymo planas. `research/` failai yra ankstesnis tyrimas, o
 > ne dabartinis backlogas. `README.md` yra originali užduoties sąlyga ir jo nekeisti.
 
@@ -100,7 +120,13 @@ Naudojami nuosavi GUID, kur jų reikia. Neperrašinėjamas visas SysVAD.
 **B:** diegia kiekvieną A paketą, tikrina Device Manager, Windows Sound ir Code
 10 bei grąžina tikslią diagnostiką.
 
-**G2 PASS:** abu endpointai rodomi po vieną, adapteris neturi Code 10.
+**G2 PASS:** B testavimo kompiuteryje abu endpointai rodomi po vieną, adapteris
+neturi Code 10.
+
+**G2 BUILD PASS / RUNTIME BLOCKED:** unikalus paketas praeina buildą ir
+signability be klaidų, tačiau nė vienas turimas kompiuteris neleidžia WDK
+testinio kernelio kodo. Tokiu atveju tęsiamas contingency demo; signing politika
+neapeinama.
 
 **G2 FAIL 1:40 momentu:** abu taiso tik INF/PnP/signing. Ring bufferio darbas be
 veikiančių endpointų neturi vertės.
