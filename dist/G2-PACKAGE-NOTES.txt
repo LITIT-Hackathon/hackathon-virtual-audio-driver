@@ -21,6 +21,13 @@ Important
 This is a WDK test-signed hackathon build, not a production-signed driver.
 Normal Secure Boot policy will reject it with Device Manager Code 52.
 
+Windows Server
+--------------
+Windows Server images can leave AudioEndpointBuilder and Audiosrv disabled.
+The MEDIA adapter can then report Started while Sound shows no endpoints.
+Use scripts\install-test-driver.ps1 from an elevated PowerShell; it stages the
+complete INF graph, enables both services, and verifies AudioEndpoint devices.
+
 Package identity
 ----------------
 Kernel binary: LITVirtualAudioCable.sys
