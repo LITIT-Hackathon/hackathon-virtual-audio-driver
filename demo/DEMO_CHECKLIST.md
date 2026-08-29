@@ -1,5 +1,8 @@
 # 3 minučių demo checklist
 
+For the complete English presenter script, timing, expected questions, RDP
+setup, troubleshooting, and fallback procedure, see `DEMO_SCENARIO.md`.
+
 ## Prieš prezentaciją
 
 - [ ] Nuspręsta, kuris režimas rodomas: `OUR DRIVER RUNTIME` arba
