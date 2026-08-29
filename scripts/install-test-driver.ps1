@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([string]$PackagePath)
+param(
+    [string]$PackagePath,
+    [switch]$CleanInstall
+)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -105,6 +108,15 @@ foreach ($inf in Get-ChildItem -LiteralPath $packageDir -Filter '*.inf' -File) {
 }
 
 $existingOutput = & $devcon findall $hardwareId 2>&1 | Out-String
+if ($CleanInstall -and $existingOutput -match '(?i)LIT Virtual Audio Cable|ROOT\\MEDIA') {
+    Write-InstallLog 'Removing the existing LIT root device for a clean interface re-enumeration.'
+    & $devcon remove $hardwareId 2>&1 | Tee-Object -FilePath $logFile -Append
+    if ($LASTEXITCODE -ne 0) { throw 'DevCon failed to remove the existing LIT virtual audio device.' }
+    & $pnputil /scan-devices 2>&1 | Tee-Object -FilePath $logFile -Append
+    Start-Sleep -Seconds 2
+    $existingOutput = ''
+}
+
 if ($existingOutput -match '(?i)LIT Virtual Audio Cable|ROOT\\MEDIA') {
     Write-InstallLog 'Updating the existing LIT virtual audio device.'
     & $devcon update $driverInf $hardwareId 2>&1 | Tee-Object -FilePath $logFile -Append
